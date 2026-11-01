@@ -5,7 +5,23 @@ edition = "2024"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
+avian2d = { version = "0.8", features = ["debug-plugin"] }
 log = { version = "*", features = ["max_level_debug", "release_max_level_warn"] }
+bevy = { package = "unkindness", git = "https://github.com/coolcatcoder/unkindness", features = ["input", "error_handling"] }
+bevy_internal = { package = "bevy", version = "0.20", default-features = false, features = [
+	"picking",
+	"scene",
+	"ui_bevy_render",
+	"2d_bevy_render",
+	"std",
+	"bevy_winit",
+	"multi_threaded",
+	"x11",
+	"webgl2",
+	"bevy_gilrs",
+	"debug",
+	"track_location",
+] }
 
 [lints.clippy]
 type_complexity = "allow"
