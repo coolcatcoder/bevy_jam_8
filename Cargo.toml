@@ -22,6 +22,9 @@ bevy_internal = { package = "bevy", version = "0.20", default-features = false, 
 	"debug",
 	"track_location",
 ] }
+serde = { version = "1", features = ["derive"] }
+ron = "0.12.3"
+bevy_common_assets = { version = "0.18", features = ["ron"] }
 
 [lints.clippy]
 type_complexity = "allow"

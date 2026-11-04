@@ -16,6 +16,7 @@ fn bindings(mut input: ResMut<Input>) {
     input.bind::<CameraMove>(DPad);
 
     input.bind::<CycleDebugSpawn>(KeyCode::Enter);
+    input.bind::<SaveObjects>(KeyCode::F1);
 }
 
 struct CameraMove;
@@ -55,4 +56,9 @@ fn cycle_debug_spawn(mut debug_spawn: ResMut<DebugSpawn>, input: Res<Input>) {
     debug_spawn.0 %= OBJECTS.len() as u8;
 
     info!("debug_spawn: {}", OBJECTS[debug_spawn.0 as usize][0]);
+}
+
+pub struct SaveObjects;
+impl ActionTemplate for SaveObjects {
+    type Template = bool;
 }

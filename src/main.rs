@@ -1,3 +1,4 @@
+use avian2d::prelude::*;
 pub use bevy::prelude;
 use bevy::prelude::*;
 
@@ -6,6 +7,7 @@ use crate::selection::{Action, Select, Selectable, Selected, TargetFor};
 mod input;
 mod map;
 mod objects;
+mod save;
 mod selection;
 mod ui;
 
@@ -17,8 +19,12 @@ fn main() -> AppExit {
             ui::plugin,
             input::plugin,
             objects::plugin,
+            save::plugin,
+            PhysicsPlugins::default().with_length_unit(10.),
+            PhysicsDebugPlugin,
         ))
-        .add_systems(Startup, (map, player))
+        .insert_resource(Gravity(Vec2::ZERO))
+        .add_systems(Startup, (map, camera))
         .run()
 }
 
@@ -28,12 +34,12 @@ fn map(mut commands: Commands, asset_server: Res<AssetServer>) {
             image: asset_server.load("map.png"),
             ..default()
         },
-        Transform::from_translation(Vec3::Z * -1.),
+        Transform::from_translation(Vec3::Z * -100.),
         TargetFor(vec![Action::Move, Action::DebugSpawn]),
     ));
 }
 
-pub fn player(mut commands: Commands, asset_server: Res<AssetServer>) {
+pub fn camera(mut commands: Commands, asset_server: Res<AssetServer>) {
     let mut projection = OrthographicProjection::default_2d();
     projection.scale = 0.3;
 
@@ -41,21 +47,33 @@ pub fn player(mut commands: Commands, asset_server: Res<AssetServer>) {
         .spawn((Camera2d, Msaa::Off, Projection::Orthographic(projection)))
         .id();
 
-    let player = commands
+    // let player = commands
+    //     .spawn((
+    //         Sprite {
+    //             image: asset_server.load("player/negative_x.png"),
+    //             ..default()
+    //         },
+    //         Selectable {
+    //             portrait: asset_server.load("player/portrait.png"),
+    //             name: "James".into(),
+    //             radius: 15.,
+    //             actions: vec![Action::Move, Action::DebugSpawn],
+    //         },
+    //     ))
+    //     .id();
+    // An entity must be selected at all times. Start out with a dummy.
+    let selection_dummy = commands
         .spawn((
-            Sprite {
-                image: asset_server.load("player/negative_x.png"),
-                ..default()
-            },
             Selectable {
                 portrait: asset_server.load("player/portrait.png"),
                 name: "James".into(),
                 radius: 15.,
-                actions: vec![Action::Move, Action::DebugSpawn],
+                actions: vec![],
             },
+            Transform::default(),
         ))
         .id();
 
-    commands.insert_resource(Selected(player));
+    commands.insert_resource(Selected(selection_dummy));
     commands.trigger(Select);
 }

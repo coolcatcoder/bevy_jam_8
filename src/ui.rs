@@ -5,12 +5,12 @@ use bevy::{
 };
 
 use crate::{
-    player,
+    camera,
     selection::{Action, PerformingAction, Select, Selectable, Selected},
 };
 
 pub fn plugin(app: &mut App) {
-    app.add_systems(Startup, (spawn_ui.before(player), setup_cursor))
+    app.add_systems(Startup, (spawn_ui.before(camera), setup_cursor))
         .add_observer(on_select);
 }
 

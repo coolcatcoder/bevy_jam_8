@@ -228,6 +228,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "anyhow"
+version = "1.0.104"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
+
+[[package]]
 name = "approx"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -675,6 +681,21 @@ dependencies = [
  "serde",
  "thiserror 2.0.21",
  "wgpu-types",
+]
+
+[[package]]
+name = "bevy_common_assets"
+version = "0.18.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7704257ada15a12c1028a05c8cf8c3c10ad2ab2e9d06bb62763d5a2c5e0b7afb"
+dependencies = [
+ "anyhow",
+ "bevy_app",
+ "bevy_asset",
+ "bevy_reflect",
+ "ron",
+ "serde",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
@@ -1134,7 +1155,10 @@ version = "0.1.0"
 dependencies = [
  "avian2d",
  "bevy",
+ "bevy_common_assets",
  "log",
+ "ron",
+ "serde",
  "unkindness",
 ]
 
