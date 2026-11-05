@@ -1156,6 +1156,7 @@ dependencies = [
  "avian2d",
  "bevy",
  "bevy_common_assets",
+ "foldhash 0.2.0",
  "log",
  "ron",
  "serde",

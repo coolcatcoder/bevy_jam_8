@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2024"
 license = "MIT OR Apache-2.0"
 
+#[lib]
+#crate-type = ["cdylib", "rlib"]
+
 [dependencies]
 avian2d = { version = "0.8", features = ["debug-plugin"] }
 log = { version = "*", features = ["max_level_debug", "release_max_level_warn"] }
@@ -25,6 +28,7 @@ bevy_internal = { package = "bevy", version = "0.20", default-features = false, 
 serde = { version = "1", features = ["derive"] }
 ron = "0.12.3"
 bevy_common_assets = { version = "0.18", features = ["ron"] }
+foldhash = "0.2.0"
 
 [lints.clippy]
 type_complexity = "allow"

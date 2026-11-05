@@ -1,12 +1,17 @@
 use avian2d::prelude::*;
 use bevy::{
-    color::palettes::css::{BLACK, LIME, WHITE},
+    camera::primitives::Aabb,
+    color::palettes::css::{BLACK, LIME, WHITE, YELLOW},
+    input_management::Input,
     prelude::*,
     window::{CursorIcon, SystemCursorIcon},
 };
 
 use crate::{
-    objects::{OBJECTS, Object, SpawnObject},
+    input::{DecreasePuzzleElement, IncreasePuzzleElement},
+    lion::Lion,
+    objects::{LoadedObjects, Object, SpawnObject},
+    puzzles::{PuzzleElements, StateChange},
     ui::SelectionAction,
 };
 
@@ -18,6 +23,13 @@ pub fn plugin(app: &mut App) {
         .add_observer(debug_print_transform)
         .init_resource::<Ghost>()
         .add_observer(change_state)
+        .add_observer(delete_object)
+        .init_resource::<SetPuzzleElement>()
+        .add_observer(SetPuzzleElement::perform_action)
+        .add_observer(grow)
+        .add_observer(grow_reach_target)
+        .add_observer(transmute)
+        .add_observer(transmute_reach_target)
         .add_systems(
             Update,
             (
@@ -26,6 +38,7 @@ pub fn plugin(app: &mut App) {
                 DebugSpawn::spawn_and_despawn_ghost,
                 DebugSpawn::haunt_the_pointer,
                 DebugSpawn::update_haunted_sprite,
+                SetPuzzleElement::input,
             ),
         );
 }
@@ -85,6 +98,9 @@ pub enum Action {
     DebugPrintTransform,
     ChangeState,
     DeleteObject,
+    PuzzleElement,
+    Grow,
+    Transmute,
 }
 impl Action {
     pub fn name(&self) -> &'static str {
@@ -94,14 +110,134 @@ impl Action {
             Self::DebugPrintTransform => "Debug print transform.",
             Self::ChangeState => "Change state.",
             Self::DeleteObject => "Delete object.",
+            Self::PuzzleElement => "Puzzle element.",
+            Self::Grow => "Grow.",
+            Self::Transmute => "Transmute.",
         }
     }
+}
+
+fn transmute(on: On<PerformAction>, mut move_towards: Query<&mut MoveTowards>) {
+    if !matches!(on.action, Action::Transmute) {
+        return;
+    }
+
+    let mut move_towards = move_towards.get_mut(on.performer).else_error()?;
+
+    *move_towards = MoveTowards::Entity(on.target, Action::Transmute);
+}
+fn transmute_reach_target(
+    on: On<ReachedTarget>,
+    mut sprites: Query<(&mut Sprite, &mut LockedAxes)>,
+) {
+    let MoveTowards::Entity(entity, Action::Transmute) = on.move_towards else {
+        return;
+    };
+
+    let (mut sprite, mut locked_axes) = sprites.get_mut(entity).else_error()?;
+    if locked_axes.is_translation_locked() {
+        sprite.color = (YELLOW * 5.).into();
+        *locked_axes = LockedAxes::ROTATION_LOCKED;
+    } else {
+        sprite.color = WHITE.into();
+        *locked_axes = LockedAxes::ALL_LOCKED;
+    }
+}
+
+fn grow(on: On<PerformAction>, mut move_towards: Query<&mut MoveTowards>) {
+    if !matches!(on.action, Action::Grow) {
+        return;
+    }
+
+    let mut move_towards = move_towards.get_mut(on.performer).else_error()?;
+
+    *move_towards = MoveTowards::Entity(on.target, Action::Grow);
+}
+fn grow_reach_target(
+    on: On<ReachedTarget>,
+    mut objects: Query<(&mut Object, &mut Sprite, &mut TargetFor)>,
+    loaded_objects: Res<LoadedObjects>,
+    mut commands: Commands,
+    mut lions: Query<&mut Lion>,
+) {
+    let MoveTowards::Entity(entity, Action::Grow) = on.move_towards else {
+        return;
+    };
+
+    let (mut object, mut sprite, mut target_for) = objects.get_mut(entity).else_error()?;
+    let action_index = target_for
+        .0
+        .iter()
+        .enumerate()
+        .find_map(|(index, action)| {
+            if matches!(action, Action::Grow) {
+                Some(index)
+            } else {
+                None
+            }
+        })
+        .else_error()?;
+    target_for.0.swap_remove(action_index);
+    object.state = 1;
+    loaded_objects.update(&object, &mut sprite);
+    commands.entity(entity).trigger(StateChange);
+
+    match object.id {
+        5 => {
+            let mut lion = lions.get_mut(entity).else_error()?;
+            lion.0 = true;
+        }
+        _ => (),
+    }
+}
+
+#[derive(Resource, Default)]
+pub struct SetPuzzleElement(u8);
+
+impl SetPuzzleElement {
+    fn input(mut set_puzzle_element: ResMut<SetPuzzleElement>, input: Res<Input>) {
+        if input.pressed::<IncreasePuzzleElement>() {
+            set_puzzle_element.0 += 1;
+        } else if input.pressed::<DecreasePuzzleElement>() {
+            set_puzzle_element.0 -= 1;
+        } else {
+            return;
+        }
+        info!("set_puzzle_element: {}", set_puzzle_element.0);
+    }
+
+    fn perform_action(
+        on: On<PerformAction>,
+        mut puzzle_elements: ResMut<PuzzleElements>,
+        set_puzzle_element: Res<SetPuzzleElement>,
+    ) {
+        if !matches!(on.action, Action::PuzzleElement) {
+            return;
+        }
+
+        puzzle_elements
+            .entity_to_element
+            .insert(on.target, set_puzzle_element.0);
+        puzzle_elements
+            .element_to_entity
+            .insert(set_puzzle_element.0, on.target);
+        info!("SetPuzzleElement perform_action: {}", set_puzzle_element.0);
+    }
+}
+
+fn delete_object(on: On<PerformAction>, mut commands: Commands) {
+    if !matches!(on.action, Action::DeleteObject) {
+        return;
+    }
+
+    commands.entity(on.target).despawn();
 }
 
 fn change_state(
     on: On<PerformAction>,
     mut object: Query<(&mut Object, &mut Sprite)>,
-    asset_server: Res<AssetServer>,
+    loaded_objects: Res<LoadedObjects>,
+    mut commands: Commands,
 ) {
     if !matches!(on.action, Action::ChangeState) {
         return;
@@ -110,14 +246,27 @@ fn change_state(
     let (mut object, mut sprite) = object.get_mut(on.target).else_error()?;
 
     object.state += 1;
-    object.state %= OBJECTS[object.id as usize].len() as u8;
+    object.state %= loaded_objects.states(object.id);
 
-    sprite.image = asset_server.load(OBJECTS[object.id as usize][object.state as usize]);
+    loaded_objects.update(&object, &mut sprite);
+
+    commands.entity(on.target).trigger(StateChange);
+
     info!("object.state: {}", object.state);
 }
 
-#[derive(Component)]
-pub struct MoveTowards(pub Option<Vec2>);
+#[derive(EntityEvent)]
+struct ReachedTarget {
+    entity: Entity,
+    move_towards: MoveTowards,
+}
+#[derive(Component, Default)]
+pub enum MoveTowards {
+    #[default]
+    None,
+    Position(Vec2),
+    Entity(Entity, Action),
+}
 impl MoveTowards {
     fn perform_action(on: On<PerformAction>, mut move_towardss: Query<&mut MoveTowards>) {
         if !matches!(on.action, Action::Move) {
@@ -125,30 +274,52 @@ impl MoveTowards {
         }
 
         let mut move_towards = move_towardss.get_mut(on.performer).else_error()?;
-        move_towards.0 = Some(on.position);
+        *move_towards = MoveTowards::Position(on.position);
     }
 
     fn motion(
         move_towardss: Query<(&mut MoveTowards, &Transform, &mut LinearVelocity)>,
         time: Res<Time>,
+        aabbs: Query<(&Transform, &Aabb)>,
+        mut commands: Commands,
     ) {
         let time = time.delta_secs();
         for (mut move_towards, transform, mut linear_velocity) in move_towardss {
             const DISTANCE: f32 = 2.;
 
-            match move_towards.0 {
-                Some(target) => {
+            match *move_towards {
+                MoveTowards::None => {
+                    linear_velocity.0 = Vec2::ZERO;
+                }
+                MoveTowards::Position(target) => {
                     let direction = (target - transform.translation.xy()).normalize_or_zero();
                     let displacement = direction * DISTANCE;
 
                     linear_velocity.0 = displacement / time;
 
                     if transform.translation.xy().distance_squared(target) < (5. * 5.) {
-                        move_towards.0 = None;
+                        let _stolen_move_towards = core::mem::take(&mut *move_towards);
                     }
                 }
-                None => {
-                    linear_velocity.0 = Vec2::ZERO;
+                MoveTowards::Entity(entity, _) => {
+                    let (target_transform, aabb) = aabbs.get(entity).else_error()?;
+                    let target = target_transform.translation.xy() + aabb.center.xy();
+                    let direction = (target - transform.translation.xy()).normalize_or_zero();
+                    let displacement = direction * DISTANCE;
+
+                    linear_velocity.0 = displacement / time;
+
+                    let acceptable_distance = aabb.half_extents.x.max(aabb.half_extents.y) + 10.;
+                    if transform.translation.xy().distance_squared(target)
+                        < (acceptable_distance * acceptable_distance)
+                    {
+                        let stolen_move_towards = core::mem::take(&mut *move_towards);
+                        commands.trigger(ReachedTarget {
+                            entity,
+                            move_towards: stolen_move_towards,
+                        });
+                        info!("Reached entity target.");
+                    }
                 }
             }
         }
@@ -231,9 +402,9 @@ impl DebugSpawn {
 
     fn update_haunted_sprite(
         ghost: Res<Ghost>,
-        asset_server: Res<AssetServer>,
         debug_spawn: Res<DebugSpawn>,
         mut sprites: Query<(&mut Sprite, &mut Object)>,
+        loaded_objects: Res<LoadedObjects>,
     ) {
         let ghost = ghost.0.else_return()?;
         let (mut sprite, mut object) = sprites.get_mut(ghost).else_return()?;
@@ -242,8 +413,8 @@ impl DebugSpawn {
             return;
         }
 
-        sprite.image = asset_server.load(OBJECTS[debug_spawn.0 as usize][0]);
         object.id = debug_spawn.0;
+        loaded_objects.update(&object, &mut sprite);
     }
 }
 
@@ -273,6 +444,7 @@ impl TargetFor {
                     Action::DebugPrintTransform,
                     Action::ChangeState,
                     Action::DeleteObject,
+                    Action::PuzzleElement,
                 ])
                 .collect(),
         )

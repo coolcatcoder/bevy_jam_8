@@ -5,11 +5,18 @@ use bevy::prelude::*;
 use crate::selection::{Action, Select, Selectable, Selected, TargetFor};
 
 mod input;
+mod lion;
 mod map;
+mod moss;
 mod objects;
+mod puzzles;
 mod save;
+mod save_format;
 mod selection;
 mod ui;
+mod water;
+
+const DEBUG: bool = false;
 
 fn main() -> AppExit {
     App::new()
@@ -20,8 +27,12 @@ fn main() -> AppExit {
             input::plugin,
             objects::plugin,
             save::plugin,
+            puzzles::plugin,
             PhysicsPlugins::default().with_length_unit(10.),
-            PhysicsDebugPlugin,
+            //PhysicsDebugPlugin,
+            moss::plugin,
+            lion::plugin,
+            water::plugin,
         ))
         .insert_resource(Gravity(Vec2::ZERO))
         .add_systems(Startup, (map, camera))
