@@ -1,6 +1,7 @@
 use avian2d::prelude::*;
 pub use bevy::prelude;
-use bevy::prelude::*;
+use bevy::{prelude::*, window::WindowResolution};
+use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::selection::{Action, Select, Selectable, Selected, TargetFor};
 
@@ -18,25 +19,41 @@ mod water;
 
 const DEBUG: bool = false;
 
-fn main() -> AppExit {
+#[wasm_bindgen]
+pub fn main(width: u32, height: u32) {
     App::new()
         .add_plugins((
-            DefaultPlugins.set(ImagePlugin::default_nearest()),
-            selection::plugin,
-            ui::plugin,
-            input::plugin,
-            objects::plugin,
-            save::plugin,
-            puzzles::plugin,
-            PhysicsPlugins::default().with_length_unit(10.),
-            //PhysicsDebugPlugin,
-            moss::plugin,
-            lion::plugin,
-            water::plugin,
+            DefaultPlugins
+                .set(ImagePlugin::default_nearest())
+                .set(WindowPlugin {
+                    primary_window: Some(Window {
+                        canvas: Some("#game".into()),
+                        resolution: WindowResolution::new(width, height),
+                        ..default()
+                    }),
+                    ..default()
+                }),
+            main_plugin,
         ))
-        .insert_resource(Gravity(Vec2::ZERO))
-        .add_systems(Startup, (map, camera))
-        .run()
+        .run();
+}
+
+pub fn main_plugin(app: &mut App) {
+    app.add_plugins((
+        selection::plugin,
+        ui::plugin,
+        input::plugin,
+        objects::plugin,
+        save::plugin,
+        puzzles::plugin,
+        PhysicsPlugins::default().with_length_unit(10.),
+        //PhysicsDebugPlugin,
+        moss::plugin,
+        lion::plugin,
+        water::plugin,
+    ))
+    .insert_resource(Gravity(Vec2::ZERO))
+    .add_systems(Startup, (map, camera));
 }
 
 fn map(mut commands: Commands, asset_server: Res<AssetServer>) {

@@ -1161,6 +1161,7 @@ dependencies = [
  "ron",
  "serde",
  "unkindness",
+ "wasm-bindgen",
 ]
 
 [[package]]
